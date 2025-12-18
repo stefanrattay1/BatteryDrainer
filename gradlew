@@ -4,6 +4,10 @@
 # Gradle wrapper script for Unix
 ##############################################################################
 
+# Resolve script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
     JAVACMD="$JAVA_HOME/bin/java"
@@ -11,16 +15,8 @@ else
     JAVACMD="java"
 fi
 
-# Use the maximum available, or set MAX_FD != -1 to use that value.
-MAX_FD="maximum"
-
-APP_NAME="Gradle"
-APP_BASE_NAME=`basename "$0"`
-
 # Add default JVM options here.
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
-
-CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+DEFAULT_JVM_OPTS="-Xmx512m -Xms256m"
 
 # Download gradle wrapper if not present
 WRAPPER_JAR="gradle/wrapper/gradle-wrapper.jar"
