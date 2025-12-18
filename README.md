@@ -29,18 +29,77 @@ Most developers test on full-battery devices in air-conditioned offices. Real us
 
 ### 📊 Pre-Built Profiles
 
-| Profile | Description | Simulates |
-|---------|-------------|-----------|
-| 😴 **Idle Baseline** | No load, measures natural drain | Standby |
-| 🔦 **Flashlight Test** | Flashlight only | Camera usage |
-| 🖥️ **CPU Light/Medium/Meltdown** | 25%/50%/100% CPU load | Background processing |
-| 🎮 **GPU Heavy** | Maximum GPU rendering | Gaming |
-| 🚗 **The Commute** | GPS + Network + Screen | Navigation apps |
-| 🎮 **The Gamer** | CPU + GPU + Audio at max | Mobile gaming |
-| 📱 **Social Scroll** | CPU + GPU + Network | Social media |
-| 📹 **Video Call** | CPU + Network + Audio | Video conferencing |
-| 🧟 **The Zombie** | Poor signal simulation | Bad connectivity |
-| 💀 **EVERYTHING** | All stressors maxed | Worst case |
+Profiles are organized by category for easy selection:
+
+#### Baseline Tests
+| Profile | Description | Use For |
+|---------|-------------|---------|
+| 😴 **Idle Baseline** | No load | Reference measurement |
+| 📺 **Screen On Only** | Display only | Isolate screen drain |
+
+#### Component Isolation
+| Profile | Description | Tests |
+|---------|-------------|-------|
+| 🔦 **Flashlight** | LED torch | LED drain |
+| 📳 **Vibration** | Haptic motor | Motor drain |
+| 📍 **GPS Only** | Location polling | GPS module |
+| 📶 **Network Only** | Downloads | Modem/WiFi |
+
+#### CPU Stress Tests
+| Profile | CPU Load | Simulates |
+|---------|----------|-----------|
+| 🖥️ **CPU Light** | 25% | Background tasks |
+| 💻 **CPU Medium** | 50% | Active app |
+| 🔥 **CPU Heavy** | 75% | Intensive work |
+| ☢️ **CPU Meltdown** | 100% | Max thermal |
+
+#### GPU Stress Tests
+| Profile | GPU Load | Simulates |
+|---------|----------|-----------|
+| 🎨 **GPU Light** | 25% | 2D UI |
+| 🖼️ **GPU Medium** | 50% | Casual 3D |
+| 🎮 **GPU Heavy** | 100% | Heavy gaming |
+
+#### Real-World Scenarios
+| Profile | Description | What It Tests |
+|---------|-------------|---------------|
+| 💬 **Messaging** | WhatsApp/Telegram | Light mixed load |
+| 📧 **Email Sync** | Background email | Periodic network |
+| 🎵 **Music Streaming** | Spotify/YT Music | Audio + network |
+| 🎙️ **Podcast** | Audio playback | Minimal drain |
+| 📱 **Social Scroll** | Instagram/TikTok | Mixed heavy load |
+| 📺 **Video Streaming** | Netflix/YouTube | Decode + network |
+| 🌐 **Web Browsing** | Chrome/Firefox | General usage |
+| 🚗 **The Commute** | Maps + Music | GPS + audio + screen |
+| 🚕 **Rideshare Driver** | Uber/Lyft mode | Continuous GPS |
+| 🏃 **Fitness Tracking** | Running apps | GPS + audio |
+| 📹 **Video Call** | Zoom/Teams | Encode + network |
+| 📞 **Voice Call** | Phone/VoIP | Audio + modem |
+
+#### Gaming Profiles
+| Profile | Load Level | Simulates |
+|---------|------------|-----------|
+| 🧩 **Casual Game** | Light | Candy Crush |
+| ⚔️ **Mid-Range Game** | Medium | Clash Royale |
+| 🎮 **Heavy Gaming** | Maximum | PUBG/Genshin |
+| 🥽 **VR/AR** ⭐ | GPU heavy | Pokemon GO |
+
+#### Productivity
+| Profile | Load | Simulates |
+|---------|------|-----------|
+| 📝 **Document Editing** | Light | Google Docs |
+| 🖼️ **Photo Editing** | Medium | Lightroom |
+| 🎬 **Video Editing** ⭐ | Heavy | CapCut |
+
+#### Worst-Case Scenarios ⭐
+| Profile | Description |
+|---------|-------------|
+| 🧟 **The Zombie** | Poor signal (power hunting) |
+| 📸 **The Photographer** | GPS + heavy processing |
+| 📡 **Live Streamer** | Record + encode + upload |
+| 💀 **EVERYTHING** | All systems maxed |
+
+⭐ = Premium profiles
 
 ### 🛡️ Safety Features
 

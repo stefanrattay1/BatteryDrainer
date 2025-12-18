@@ -112,6 +112,53 @@ class SensorStressor(private val context: Context) : Stressor {
         return hasFlashlight() || hasVibrator() || hasGps()
     }
     
+    /**
+     * Check if GPS can actually be used (hardware + system setting + permission)
+     */
+    fun canUseGps(): Boolean {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        return hasGps() && 
+               locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true &&
+               hasLocationPermission()
+    }
+    
+    /**
+     * Get detailed availability status for each sensor
+     */
+    fun getSensorAvailability(): Map<String, SensorAvailabilityInfo> {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        val gpsSystemEnabled = locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
+        
+        return mapOf(
+            "GPS" to SensorAvailabilityInfo(
+                hasHardware = hasGps(),
+                isSystemEnabled = gpsSystemEnabled,
+                hasPermission = hasLocationPermission(),
+                isReady = canUseGps(),
+                statusMessage = when {
+                    !hasGps() -> "No GPS hardware"
+                    !gpsSystemEnabled -> "GPS is OFF in settings"
+                    !hasLocationPermission() -> "Permission required"
+                    else -> "Ready"
+                }
+            ),
+            "Flashlight" to SensorAvailabilityInfo(
+                hasHardware = hasFlashlight(),
+                isSystemEnabled = true,
+                hasPermission = true,
+                isReady = hasFlashlight(),
+                statusMessage = if (hasFlashlight()) "Ready" else "No flashlight"
+            ),
+            "Vibration" to SensorAvailabilityInfo(
+                hasHardware = hasVibrator(),
+                isSystemEnabled = true,
+                hasPermission = true,
+                isReady = hasVibrator(),
+                statusMessage = if (hasVibrator()) "Ready" else "No vibrator"
+            )
+        )
+    }
+    
     override fun getEstimatedPowerDraw(): Int {
         var power = 0
         if (gpsEnabled.value) power += 150      // GPS: ~150mA
@@ -243,10 +290,32 @@ class SensorStressor(private val context: Context) : Stressor {
         ) == PackageManager.PERMISSION_GRANTED
     }
     
+    /**
+     * Check if GPS is actually enabled in system settings
+     */
+    private fun isGpsSystemEnabled(): Boolean {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        return locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
+    }
+    
     @SuppressLint("MissingPermission")
     private fun startGps() {
-        if (!hasGps() || !hasLocationPermission()) {
+        // Check all requirements: hardware, system setting, and permission
+        if (!hasGps()) {
             gpsEnabled.value = false
+            android.util.Log.w("SensorStressor", "GPS hardware not available")
+            return
+        }
+        
+        if (!isGpsSystemEnabled()) {
+            gpsEnabled.value = false
+            android.util.Log.w("SensorStressor", "GPS is turned off in system settings")
+            return
+        }
+        
+        if (!hasLocationPermission()) {
+            gpsEnabled.value = false
+            android.util.Log.w("SensorStressor", "Location permission not granted")
             return
         }
         
@@ -275,8 +344,10 @@ class SensorStressor(private val context: Context) : Stressor {
                 Looper.getMainLooper()
             )
             gpsEnabled.value = true
+            android.util.Log.i("SensorStressor", "GPS started successfully")
         } catch (e: Exception) {
             gpsEnabled.value = false
+            android.util.Log.e("SensorStressor", "Failed to start GPS: ${e.message}")
         }
     }
     
@@ -289,3 +360,14 @@ class SensorStressor(private val context: Context) : Stressor {
         gpsEnabled.value = false
     }
 }
+
+/**
+ * Detailed availability info for a sensor
+ */
+data class SensorAvailabilityInfo(
+    val hasHardware: Boolean,
+    val isSystemEnabled: Boolean,
+    val hasPermission: Boolean,
+    val isReady: Boolean,
+    val statusMessage: String
+)

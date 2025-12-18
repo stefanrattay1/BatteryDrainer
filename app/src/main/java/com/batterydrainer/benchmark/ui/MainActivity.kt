@@ -6,10 +6,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraAccessException
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.VibrationEffect
 import android.provider.Settings
 import android.view.View
 import android.widget.Toast
@@ -26,7 +28,11 @@ import com.batterydrainer.benchmark.monitor.BatteryMonitor
 import com.batterydrainer.benchmark.monitor.ThermalProtection
 import com.batterydrainer.benchmark.report.ReportGenerator
 import com.batterydrainer.benchmark.service.DrainerService
+import com.batterydrainer.benchmark.util.SystemStatusChecker
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.DecimalFormat
 
@@ -36,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var batteryMonitor: BatteryMonitor
     private lateinit var thermalProtection: ThermalProtection
     private lateinit var reportGenerator: ReportGenerator
+    private lateinit var systemStatusChecker: SystemStatusChecker
     
     private var drainerService: DrainerService? = null
     private var serviceBound = false
@@ -44,6 +51,11 @@ class MainActivity : AppCompatActivity() {
     
     private val currentFormat = DecimalFormat("#,##0")
     private val tempFormat = DecimalFormat("0.0")
+    
+    // Quick toggle states
+    private var isFlashlightOn = false
+    private var isVibrating = false
+    private var vibrationJob: Job? = null
     
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -66,6 +78,8 @@ class MainActivity : AppCompatActivity() {
         if (!allGranted) {
             Toast.makeText(this, "Some permissions were denied. Features may be limited.", Toast.LENGTH_LONG).show()
         }
+        // Refresh system status after permission changes
+        updateSystemStatus()
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,6 +90,7 @@ class MainActivity : AppCompatActivity() {
         batteryMonitor = BatteryMonitor(this)
         thermalProtection = ThermalProtection(this)
         reportGenerator = ReportGenerator(this)
+        systemStatusChecker = SystemStatusChecker(this)
         
         setupUI()
         requestPermissions()
@@ -94,18 +109,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
+    override fun onResume() {
+        super.onResume()
+        // Refresh system status when returning to the app
+        updateSystemStatus()
+    }
+    
     override fun onStop() {
         super.onStop()
         if (serviceBound) {
             unbindService(serviceConnection)
             serviceBound = false
         }
+        // Turn off flashlight and vibration when leaving the app
+        turnOffFlashlight()
+        stopVibrationLoop()
     }
     
     override fun onDestroy() {
         super.onDestroy()
         batteryMonitor.stopMonitoring()
         thermalProtection.stopMonitoring()
+        turnOffFlashlight()
+        stopVibrationLoop()
     }
     
     private fun setupUI() {
@@ -123,13 +149,31 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Quick stressor toggles
+        // Quick stressor toggles - these actually work now!
         binding.toggleFlashlight.setOnCheckedChangeListener { _, isChecked ->
-            // Quick toggle for flashlight only
+            if (isChecked) {
+                if (systemStatusChecker.hasFlashlight()) {
+                    turnOnFlashlight()
+                } else {
+                    binding.toggleFlashlight.isChecked = false
+                    Toast.makeText(this, "Flashlight not available on this device", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                turnOffFlashlight()
+            }
         }
         
         binding.toggleVibrate.setOnCheckedChangeListener { _, isChecked ->
-            // Quick toggle for vibration only
+            if (isChecked) {
+                if (systemStatusChecker.hasVibrator()) {
+                    startVibrationLoop()
+                } else {
+                    binding.toggleVibrate.isChecked = false
+                    Toast.makeText(this, "Vibrator not available on this device", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                stopVibrationLoop()
+            }
         }
         
         // Settings
@@ -143,6 +187,7 @@ class MainActivity : AppCompatActivity() {
         }
         
         updateProfileDisplay()
+        updateSystemStatus()
     }
     
     private fun requestPermissions() {
@@ -280,6 +325,40 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startTest() {
+        // Validate that required features are available
+        val status = systemStatusChecker.getSystemStatus()
+        val warnings = mutableListOf<String>()
+        
+        if (selectedProfile.gpsEnabled && !status.gpsSystemEnabled) {
+            warnings.add("GPS is OFF in system settings")
+        }
+        if (selectedProfile.gpsEnabled && !status.gpsPermissionGranted) {
+            warnings.add("Location permission not granted")
+        }
+        if (selectedProfile.networkLoad > 0 && !status.networkConnected) {
+            warnings.add("No network connection")
+        }
+        if (selectedProfile.flashlightEnabled && !status.flashlightAvailable) {
+            warnings.add("Flashlight not available")
+        }
+        if (selectedProfile.vibrateEnabled && !status.vibratorAvailable) {
+            warnings.add("Vibrator not available")
+        }
+        
+        if (warnings.isNotEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("⚠️ Features Unavailable")
+                .setMessage("The following features won't work:\n\n• ${warnings.joinToString("\n• ")}\n\nDo you want to continue anyway?")
+                .setPositiveButton("Continue") { _, _ -> doStartTest() }
+                .setNegativeButton("Cancel", null)
+                .show()
+            return
+        }
+        
+        doStartTest()
+    }
+    
+    private fun doStartTest() {
         val config = TestConfig(
             targetBatteryDrop = 10,
             maxDurationMinutes = 60,
@@ -349,6 +428,138 @@ class MainActivity : AppCompatActivity() {
                     reportGenerator.saveReport(report, com.batterydrainer.benchmark.data.ExportFormat.HTML)
                 }
             }
+        }
+    }
+    
+    // ========== SYSTEM STATUS ==========
+    
+    private fun updateSystemStatus() {
+        try {
+            val status = systemStatusChecker.getSystemStatus()
+            android.util.Log.d("MainActivity", "System Status: GPS=${status.gpsSystemEnabled}, Net=${status.networkConnected}, Flash=${status.flashlightAvailable}, Vib=${status.vibratorAvailable}")
+            
+            binding.apply {
+                // GPS Status
+                val gpsReady = status.gpsSystemEnabled && status.gpsPermissionGranted && status.gpsHardwareAvailable
+                gpsStatusIcon.alpha = if (gpsReady) 1.0f else 0.4f
+                gpsStatusValue.text = when {
+                    !status.gpsHardwareAvailable -> "N/A"
+                    !status.gpsSystemEnabled -> "Off"
+                    !status.gpsPermissionGranted -> "No perm"
+                    else -> status.locationMode
+                }
+            gpsStatusValue.setTextColor(getColor(
+                if (gpsReady) R.color.charge_color else R.color.text_secondary
+            ))
+            
+            // Network Status
+            networkStatusIcon.alpha = if (status.networkConnected) 1.0f else 0.4f
+            networkStatusValue.text = status.networkType
+            networkStatusValue.setTextColor(getColor(
+                if (status.networkConnected) R.color.charge_color else R.color.text_secondary
+            ))
+            
+            // Flash Status
+            flashStatusIcon.alpha = if (status.flashlightAvailable) 1.0f else 0.4f
+            flashStatusValue.text = when {
+                !status.flashlightAvailable -> "N/A"
+                isFlashlightOn -> "On"
+                else -> "Ready"
+            }
+            flashStatusValue.setTextColor(getColor(
+                if (isFlashlightOn) R.color.charge_color else R.color.text_secondary
+            ))
+            
+            // Vibrator Status
+            vibratorStatusIcon.alpha = if (status.vibratorAvailable) 1.0f else 0.4f
+            vibratorStatusValue.text = when {
+                !status.vibratorAvailable -> "N/A"
+                isVibrating -> "On"
+                else -> "Ready"
+            }
+            vibratorStatusValue.setTextColor(getColor(
+                if (isVibrating) R.color.charge_color else R.color.text_secondary
+            ))
+            
+            // Show hint if GPS needs to be enabled
+            if (!status.gpsSystemEnabled && status.gpsHardwareAvailable) {
+                statusHint.visibility = View.VISIBLE
+                statusHint.text = "📍 Turn on GPS in system settings to use location features"
+            } else if (!status.gpsPermissionGranted && status.gpsHardwareAvailable) {
+                statusHint.visibility = View.VISIBLE
+                statusHint.text = "📍 Grant location permission to use GPS"
+            } else {
+                statusHint.visibility = View.GONE
+            }
+        }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error updating system status", e)
+        }
+    }
+    
+    // ========== FLASHLIGHT CONTROL ==========
+    
+    private fun turnOnFlashlight() {
+        val cameraManager = systemStatusChecker.getCameraManager() ?: return
+        val cameraId = systemStatusChecker.getFlashlightCameraId() ?: return
+        
+        try {
+            cameraManager.setTorchMode(cameraId, true)
+            isFlashlightOn = true
+            updateSystemStatus()
+        } catch (e: CameraAccessException) {
+            isFlashlightOn = false
+            binding.toggleFlashlight.isChecked = false
+            Toast.makeText(this, "Could not turn on flashlight: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun turnOffFlashlight() {
+        if (!isFlashlightOn) return
+        
+        val cameraManager = systemStatusChecker.getCameraManager() ?: return
+        val cameraId = systemStatusChecker.getFlashlightCameraId() ?: return
+        
+        try {
+            cameraManager.setTorchMode(cameraId, false)
+        } catch (e: CameraAccessException) {
+            // Ignore errors when turning off
+        }
+        isFlashlightOn = false
+        updateSystemStatus()
+    }
+    
+    // ========== VIBRATION CONTROL ==========
+    
+    private fun startVibrationLoop() {
+        val vibrator = systemStatusChecker.getVibrator() ?: return
+        
+        isVibrating = true
+        updateSystemStatus()
+        
+        vibrationJob = lifecycleScope.launch {
+            while (isActive && isVibrating) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(400, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(400)
+                }
+                delay(600) // 400ms vibration + 200ms pause
+            }
+        }
+    }
+    
+    private fun stopVibrationLoop() {
+        vibrationJob?.cancel()
+        vibrationJob = null
+        systemStatusChecker.getVibrator()?.cancel()
+        isVibrating = false
+        
+        // Only update UI if view is still valid
+        if (!isFinishing && !isDestroyed) {
+            binding.toggleVibrate.isChecked = false
+            updateSystemStatus()
         }
     }
 }

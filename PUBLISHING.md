@@ -51,6 +51,51 @@ chmod +x gradlew
 ./gradlew assembleRelease
 ```
 
+### Option C: Using Build Script (Easiest)
+
+We provide ready-to-use build scripts:
+
+**Linux/macOS/WSL:**
+```bash
+# Make executable
+chmod +x build_apk.sh
+
+# Build debug (default)
+./build_apk.sh
+
+# Build release + bundle
+./build_apk.sh -r
+
+# Build all variants
+./build_apk.sh -a
+
+# Clean build and install to device
+./build_apk.sh -c -d -i
+
+# See all options
+./build_apk.sh --help
+```
+
+**Windows:**
+```cmd
+REM Build debug (default)
+build_apk.bat
+
+REM Build release + bundle
+build_apk.bat -r
+
+REM Clean build
+build_apk.bat -c -r
+
+REM Build and install
+build_apk.bat -d -i
+```
+
+**Script Output:**
+- APKs are copied to `release-builds/` folder
+- Timestamped builds: `BatteryDrainer-debug-20251218_143022.apk`
+- Latest builds: `BatteryDrainer-debug-latest.apk`
+
 ---
 
 ## 🔐 Signing for Release
@@ -232,19 +277,109 @@ For questions: https://github.com/stefanrattay1/BatteryDrainer/issues
 
 ### Step 6: App Bundle Upload
 
-1. **Release → Production → Create new release**
-2. Upload your signed APK or AAB (App Bundle preferred)
-3. Add release notes:
+#### First Time Setup (New App)
+
+1. **Go to Play Console**: https://play.google.com/console
+
+2. **Create the App**:
+   - Click **"Create app"** button (top right)
+   - App name: `Battery Drainer Benchmark`
+   - Default language: English (United States)
+   - App or Game: **App**
+   - Free or Paid: **Free**
+   - Accept declarations → **Create app**
+
+3. **Complete Dashboard Tasks** (left sidebar):
+   
+   📋 **Set up your app** (must complete all):
+   - App access → Select "All functionality is available without special access"
+   - Ads → Select "No, my app does not contain ads"
+   - Content ratings → Complete questionnaire
+   - Target audience → Select "18 and over" (safest for utility apps)
+   - News app → Select "No"
+   - COVID-19 apps → Select "No"
+   - Data safety → Fill out (see below)
+   - Government apps → Select "No"
+   
+   🏪 **Store listing** (Main store listing):
+   - App name, Short description, Full description (see above)
+   - Upload App icon (512x512 PNG)
+   - Upload Feature graphic (1024x500 PNG)
+   - Upload Phone screenshots (minimum 2)
+   - Select app category: **Tools**
+   - Add contact email
+
+4. **Data Safety Form**:
    ```
+   Does your app collect or share user data? → No
+   (Battery Drainer keeps all data on-device)
+   ```
+
+5. **App Signing Setup**:
+   - Go to: **Release → Setup → App signing**
+   - Choose: **"Use Google Play App Signing"** (recommended)
+   - This lets Google manage your signing key securely
+   - You can upload unsigned AAB files
+
+#### Upload Your AAB File
+
+1. **Navigate to Production**:
+   - Left sidebar: **Release → Production**
+   - Click **"Create new release"**
+
+2. **App Signing** (first time only):
+   - If prompted, opt into **Play App Signing**
+   - Click **Continue**
+
+3. **Upload the Bundle**:
+   - Click **"Upload"** button
+   - Select your file: `release-builds/BatteryDrainer-release-latest.aab`
+   - Wait for upload and processing (1-2 minutes)
+   - You'll see the version code and version name
+
+4. **Release Notes**:
+   ```
+   What's new in this release:
+   
    Version 1.0.0 - Initial Release
    
-   • Real-time battery monitoring
-   • Multiple stress test profiles
-   • Thermal protection system
-   • Professional report generation
-   • ADB automation support
+   🔋 Professional battery benchmarking tool
+   • 35+ stress test profiles for real-world scenarios
+   • Real-time battery monitoring (mA, voltage, temperature)
+   • CPU, GPU, Network, and Sensor stress modules
+   • Automatic thermal protection
+   • Professional report generation (JSON/CSV/HTML)
+   • ADB automation for device farms
+   
+   Perfect for QA teams, developers, and power users!
    ```
-4. **Save → Review release → Start rollout**
+
+5. **Review and Rollout**:
+   - Click **"Review release"**
+   - Check for errors/warnings
+   - Click **"Start rollout to Production"**
+   - Confirm by clicking **"Rollout"**
+
+#### After Submission
+
+- **Status**: "In review" (takes 3-7 days for first app)
+- **Email**: You'll receive updates at your developer email
+- **Track**: Check Play Console dashboard for status
+
+#### Updating Your App Later
+
+1. Increment version in `app/build.gradle.kts`:
+   ```kotlin
+   versionCode = 2  // Increment this
+   versionName = "1.1.0"
+   ```
+
+2. Build new AAB:
+   ```bash
+   ./build_apk.sh -r
+   ```
+
+3. Play Console → Release → Production → Create new release → Upload → Rollout
 
 ### Step 7: Review Timeline
 
