@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Colors - Dark Theme -->
+    <color name="background_dark">#121212</color>
+    <color name="card_background">#1E1E1E</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B3B3B3</color>
+    
+    <!-- Battery Status -->
+    <color name="charge_color">#4CAF50</color>
+    <color name="discharge_color">#FF5722</color>
+    
+    <!-- Temperature Colors -->
+    <color name="temp_normal">#4CAF50</color>
+    <color name="temp_warning">#FFC107</color>
+    <color name="temp_critical">#F44336</color>
+    
+    <!-- Button Colors -->
+    <color name="start_button">#4CAF50</color>
+    <color name="stop_button">#F44336</color>
+    <color name="pause_button">#FFC107</color>
+    
+    <!-- Accent -->
+    <color name="accent">#6200EE</color>
+    <color name="accent_light">#BB86FC</color>
+    
+    <!-- Standard -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    
+    <!-- Progress Colors -->
+    <color name="progress_background">#333333</color>
+    <color name="progress_battery">#4CAF50</color>
+    <color name="progress_test">#6200EE</color>
+</resources>

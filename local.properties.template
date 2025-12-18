@@ -1,0 +1,16 @@
+# This file should *NOT* be checked into Version Control Systems,
+# as it contains information specific to your local configuration.
+
+# Location of the Android SDK. This is required for building.
+# Update this path to your Android SDK installation:
+
+# Windows example:
+# sdk.dir=C\:\\Users\\YourName\\AppData\\Local\\Android\\Sdk
+
+# macOS example:
+# sdk.dir=/Users/YourName/Library/Android/sdk
+
+# Linux example:
+# sdk.dir=/home/YourName/Android/Sdk
+
+sdk.dir=

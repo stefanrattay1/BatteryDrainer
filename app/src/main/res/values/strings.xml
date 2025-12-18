@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Battery Drainer</string>
+    <string name="app_description">Professional Battery Benchmarking Tool</string>
+    
+    <!-- Main Screen -->
+    <string name="ready_to_test">Ready to test</string>
+    <string name="start_test">START TEST</string>
+    <string name="stop_test">STOP TEST</string>
+    <string name="pause_test">PAUSE</string>
+    <string name="resume_test">RESUME</string>
+    
+    <!-- Profile Names -->
+    <string name="profile_idle">Idle Baseline</string>
+    <string name="profile_commute">The Commute</string>
+    <string name="profile_gamer">The Gamer</string>
+    <string name="profile_zombie">The Zombie</string>
+    
+    <!-- Notifications -->
+    <string name="notification_channel_name">Battery Drainer Test</string>
+    <string name="notification_channel_description">Shows progress of battery drain tests</string>
+    <string name="notification_title">Battery Drainer Running</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="thermal_protection">Thermal Protection</string>
+    <string name="thermal_limit">Temperature Limit</string>
+    
+    <!-- Reports -->
+    <string name="reports_title">Test Reports</string>
+    <string name="no_reports">No reports yet</string>
+    
+    <!-- Errors -->
+    <string name="error_permission_denied">Permission denied</string>
+    <string name="error_thermal_stop">Test stopped due to high temperature</string>
+</resources>
