@@ -48,25 +48,28 @@ class StressorManager(private val context: Context) {
     /**
      * Start all stressors according to a profile
      */
-    suspend fun startProfile(profile: StressProfile) {
+    suspend fun startProfile(profile: StressProfile): Boolean {
         if (_isRunning.value) {
             stopAll()
         }
         
         _activeProfile.value = profile
-        _isRunning.value = true
+        var startedAny = false
         
         // Start each stressor with its configured intensity
         if (profile.cpuLoad > 0) {
             cpuStressor.start(profile.cpuLoad)
+            startedAny = startedAny || cpuStressor.isRunning.value
         }
         
         if (profile.gpuLoad > 0) {
             gpuStressor.start(profile.gpuLoad)
+            startedAny = startedAny || gpuStressor.isRunning.value
         }
         
         if (profile.networkLoad > 0) {
             networkStressor.start(profile.networkLoad)
+            startedAny = startedAny || networkStressor.isRunning.value
         }
         
         // Configure and start sensor stressor
@@ -77,9 +80,18 @@ class StressorManager(private val context: Context) {
                 vibration = profile.vibrateEnabled
             )
             sensorStressor.start(100) // Full intensity since we manually configured
+            startedAny = startedAny || sensorStressor.isRunning.value
         }
         
+        _isRunning.value = startedAny
+        if (!startedAny) {
+            _activeProfile.value = null
+            _totalEstimatedPowerDraw.value = 0
+            return false
+        }
+
         updatePowerEstimate()
+        return true
     }
     
     /**

@@ -78,26 +78,34 @@ class GpuStressor(private val context: Context) : Stressor {
     
     override suspend fun start(intensity: Int) {
         if (_isRunning.value) return
-        
+
         shouldRun.set(true)
         this.intensity.set(intensity.coerceIn(0, 100))
-        _isRunning.value = true
         _currentLoad.value = intensity.coerceIn(0, 100)
         startTime = System.currentTimeMillis()
         frameCount = 0
-        
+
         renderJob = CoroutineScope(Dispatchers.Default).launch {
             try {
+                Log.i(TAG, "Starting GPU stressor with intensity: $intensity")
                 initEGL()
                 initShaders()
                 initGeometry()
+                _isRunning.value = true
+                Log.i(TAG, "GPU initialization complete, starting render loop")
                 renderLoop()
             } catch (e: Exception) {
                 Log.e(TAG, "GPU stress error: ${e.message}", e)
+                _isRunning.value = false
+                _currentLoad.value = 0
             } finally {
                 cleanupEGL()
+                _isRunning.value = false
             }
         }
+
+        // Wait briefly for initialization to complete
+        delay(100)
     }
     
     override suspend fun stop() {

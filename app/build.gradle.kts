@@ -40,6 +40,12 @@ android {
         jvmTarget = "17"
     }
 
+    adbOptions {
+        // Give ddmlib more time to push large APKs and auto-grant runtime permissions for tests
+        timeOutInMs = 5 * 60 * 1000
+        installOptions.add("-g")
+    }
+
     buildFeatures {
         viewBinding = true
         buildConfig = true
@@ -81,4 +87,5 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation("androidx.test.espresso:espresso-intents:3.5.1")
 }

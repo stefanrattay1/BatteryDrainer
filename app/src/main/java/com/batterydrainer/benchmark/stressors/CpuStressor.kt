@@ -112,36 +112,68 @@ class CpuStressor(private val context: Context) : Stressor {
      */
     private suspend fun runCpuWork(coreIndex: Int, intensity: WorkIntensity) {
         val precision = when (intensity) {
-            WorkIntensity.LIGHT -> 100
-            WorkIntensity.MEDIUM -> 500
-            WorkIntensity.HEAVY -> 1000
-            WorkIntensity.EXTREME -> 2000
+            WorkIntensity.LIGHT -> 200
+            WorkIntensity.MEDIUM -> 800
+            WorkIntensity.HEAVY -> 1500
+            WorkIntensity.EXTREME -> 3000
         }
-        
+
         val sleepMs = when (intensity) {
-            WorkIntensity.LIGHT -> 50L
-            WorkIntensity.MEDIUM -> 20L
-            WorkIntensity.HEAVY -> 5L
+            WorkIntensity.LIGHT -> 30L
+            WorkIntensity.MEDIUM -> 10L
+            WorkIntensity.HEAVY -> 2L
             WorkIntensity.EXTREME -> 0L
         }
-        
+
+        // Iterations per yield - higher intensity = more work per yield
+        val iterationsPerYield = when (intensity) {
+            WorkIntensity.LIGHT -> 1
+            WorkIntensity.MEDIUM -> 3
+            WorkIntensity.HEAVY -> 5
+            WorkIntensity.EXTREME -> 10
+        }
+
+        var iteration = 0
         while (shouldRun.get()) {
             // Calculate Pi using Machin's formula for CPU stress
             calculatePi(precision)
-            
-            // Also do some prime number calculations
-            findPrimesInRange(10000 + (coreIndex * 1000), 11000 + (coreIndex * 1000))
-            
-            // Matrix multiplication for additional load
-            matrixMultiply(50 + (precision / 20))
-            
+
+            // Prime number calculations with varying ranges for more work
+            val primeStart = 10000 + (coreIndex * 1000) + (iteration % 10) * 500
+            findPrimesInRange(primeStart, primeStart + 2000)
+
+            // Matrix multiplication for additional load - larger matrices
+            matrixMultiply(80 + (precision / 15))
+
+            // Additional floating point work
+            performFloatingPointWork(precision * 10)
+
+            iteration++
+
             if (sleepMs > 0) {
                 delay(sleepMs)
             }
-            
-            // Yield to prevent complete system lockup
-            yield()
+
+            // Only yield periodically to maximize CPU usage
+            if (iteration % iterationsPerYield == 0) {
+                yield()
+            }
         }
+    }
+
+    /**
+     * Additional floating point intensive work
+     */
+    private fun performFloatingPointWork(iterations: Int) {
+        var result = 1.0
+        for (i in 0 until iterations) {
+            result = kotlin.math.sin(result) + kotlin.math.cos(result * 1.1)
+            result = kotlin.math.sqrt(kotlin.math.abs(result) + 1.0)
+            result = kotlin.math.tan(result * 0.5)
+        }
+        // Use result to prevent compiler optimization
+        @Suppress("UNUSED_VARIABLE")
+        val dummy = result
     }
     
     /**

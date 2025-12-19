@@ -53,7 +53,19 @@ class SystemStatusChecker(private val context: Context) {
      */
     fun isGpsEnabled(): Boolean {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-        return locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
+        val locationMasterEnabled = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            locationManager?.isLocationEnabled == true
+        } else {
+            val mode = Settings.Secure.getInt(
+                context.contentResolver,
+                Settings.Secure.LOCATION_MODE,
+                Settings.Secure.LOCATION_MODE_OFF
+            )
+            mode != Settings.Secure.LOCATION_MODE_OFF
+        }
+
+        val gpsProviderEnabled = locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
+        return locationMasterEnabled && gpsProviderEnabled
     }
 
     /**

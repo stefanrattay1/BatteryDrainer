@@ -16,6 +16,7 @@ class ReportGenerator(private val context: Context) {
     
     private val gson = GsonBuilder().setPrettyPrinting().create()
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+    private val fileDateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
     
     /**
      * Generate a complete test report
@@ -64,6 +65,27 @@ class ReportGenerator(private val context: Context) {
         }
         
         return sb.toString()
+    }
+
+    /**
+     * Export a compact plain-text summary (for quick sharing/logging).
+     */
+    fun exportToText(report: TestReport): String {
+        return buildString {
+            appendLine("BatteryDrainer Report")
+            appendLine("Profile: ${report.session.profileName}")
+            appendLine("Start: ${dateFormat.format(Date(report.session.startTime))}")
+            appendLine("End: ${report.session.endTime?.let { dateFormat.format(Date(it)) } ?: "running"}")
+            appendLine("Duration: ${String.format("%.1f", report.summary.totalDurationMinutes)} min")
+            appendLine("Battery drop: ${report.summary.batteryDrainPercent}%")
+            appendLine("Avg current: ${String.format("%.0f", report.summary.averageCurrentMa)} mA")
+            appendLine("Peak temp: ${String.format("%.1f", report.summary.peakTemperatureCelsius)} °C")
+            appendLine("Drain rate: ${String.format("%.1f", report.summary.drainRatePercentPerHour)} %/hr")
+            if (report.summary.totalEnergyUsedMwh != null) {
+                appendLine("Energy used: ${String.format("%.1f", report.summary.totalEnergyUsedMwh)} mWh")
+            }
+            appendLine("Stressors: ${report.session.stressors.joinToString()}")
+        }
     }
     
     /**
@@ -157,14 +179,14 @@ class ReportGenerator(private val context: Context) {
      * Save report to file
      */
     fun saveReport(report: TestReport, format: ExportFormat): File {
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
-            .format(Date(report.session.startTime))
+        val timestamp = fileDateFormat.format(Date(report.session.startTime))
         
         val (content, extension) = when (format) {
             ExportFormat.JSON -> exportToJson(report) to "json"
             ExportFormat.CSV -> exportToCsv(report) to "csv"
             ExportFormat.HTML -> exportToHtml(report) to "html"
             ExportFormat.PDF -> exportToHtml(report) to "html" // PDF generation requires iText
+            ExportFormat.TEXT -> exportToText(report) to "txt"
         }
         
         val filename = "battery_report_${report.session.profileId}_$timestamp.$extension"
@@ -173,6 +195,18 @@ class ReportGenerator(private val context: Context) {
         file.writeText(content)
         
         return file
+    }
+
+    /**
+     * Save a bundle of outputs (HTML, CSV, JSON, TXT) for easy export.
+     */
+    fun saveReportBundle(report: TestReport): List<File> {
+        return listOf(
+            saveReport(report, ExportFormat.HTML),
+            saveReport(report, ExportFormat.CSV),
+            saveReport(report, ExportFormat.JSON),
+            saveReport(report, ExportFormat.TEXT)
+        )
     }
     
     private fun generateSummary(session: TestSession): ReportSummary {

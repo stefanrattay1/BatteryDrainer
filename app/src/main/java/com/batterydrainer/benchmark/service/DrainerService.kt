@@ -187,18 +187,34 @@ class DrainerService : LifecycleService() {
             }
         )
         _currentSession.value = session
-        
-        _isTestRunning.value = true
         _isPaused.value = false
-        _statusMessage.value = "Running: ${profile.name}"
+        _statusMessage.value = "Starting: ${profile.name}"
         
         // Start stressors
         lifecycleScope.launch {
-            stressorManager.startProfile(profile)
+            val started = stressorManager.startProfile(profile)
+            if (!started) {
+                _isTestRunning.value = false
+                _isPaused.value = false
+                _testProgress.value = 0f
+                _statusMessage.value = "Test cannot start: required sensors unavailable"
+                _currentSession.value = null
+                batteryMonitor.stopMonitoring()
+                thermalProtection.stopMonitoring()
+                thermalProtection.reset()
+                releaseWakeLock()
+                updateNotification()
+                onTestError?.invoke("Cannot start '${profile.name}' because required hardware, permissions, or system settings are missing.")
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@launch
+            }
+
+            _isTestRunning.value = true
+            _statusMessage.value = "Running: ${profile.name}"
+            updateNotification()
             monitorTestProgress()
         }
-        
-        updateNotification()
     }
     
     /**
@@ -273,7 +289,10 @@ class DrainerService : LifecycleService() {
         
         currentProfile?.let { profile ->
             lifecycleScope.launch {
-                stressorManager.startProfile(profile)
+                val restarted = stressorManager.startProfile(profile)
+                if (!restarted) {
+                    stopTest(wasAborted = true, abortReason = "Required stressors unavailable on resume")
+                }
             }
         }
         

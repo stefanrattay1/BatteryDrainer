@@ -66,5 +66,6 @@ enum class ExportFormat {
     JSON,
     CSV,
     PDF,
-    HTML
+    HTML,
+    TEXT
 }

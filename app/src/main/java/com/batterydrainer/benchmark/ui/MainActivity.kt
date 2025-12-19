@@ -1,6 +1,7 @@
 package com.batterydrainer.benchmark.ui
 
 import android.Manifest
+import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -20,6 +21,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.batterydrainer.benchmark.BuildConfig
 import com.batterydrainer.benchmark.R
 import com.batterydrainer.benchmark.data.StressProfile
 import com.batterydrainer.benchmark.data.TestConfig
@@ -56,6 +58,13 @@ class MainActivity : AppCompatActivity() {
     private var isFlashlightOn = false
     private var isVibrating = false
     private var vibrationJob: Job? = null
+
+    private fun isRunningUiTest(): Boolean = try {
+        Class.forName("androidx.test.platform.app.InstrumentationRegistry")
+        true
+    } catch (_: Throwable) {
+        false
+    }
     
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -68,6 +77,7 @@ class MainActivity : AppCompatActivity() {
         override fun onServiceDisconnected(name: ComponentName?) {
             drainerService = null
             serviceBound = false
+            updateTestControls(false)
         }
     }
     
@@ -191,6 +201,8 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun requestPermissions() {
+        if (isRunningUiTest()) return
+
         val permissions = mutableListOf<String>()
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -209,8 +221,8 @@ class MainActivity : AppCompatActivity() {
             permissionLauncher.launch(permissions.toTypedArray())
         }
         
-        // Request battery optimization exemption
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        // Request battery optimization exemption (skip in debug/tests to avoid UI-blocking dialog)
+        if (!BuildConfig.DEBUG && !isRunningUiTest() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
             if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
                 showBatteryOptimizationDialog()
@@ -323,6 +335,12 @@ class MainActivity : AppCompatActivity() {
             vibrateIndicator.visibility = if (selectedProfile.vibrateEnabled) View.VISIBLE else View.GONE
         }
     }
+
+    private fun isGpuAvailable(): Boolean {
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val info = am.deviceConfigurationInfo
+        return info.reqGlEsVersion >= 0x20000
+    }
     
     private fun startTest() {
         // Validate that required features are available
@@ -344,13 +362,15 @@ class MainActivity : AppCompatActivity() {
         if (selectedProfile.vibrateEnabled && !status.vibratorAvailable) {
             warnings.add("Vibrator not available")
         }
+        if (selectedProfile.gpuLoad > 0 && !isGpuAvailable()) {
+            warnings.add("GPU does not support OpenGL ES 2.0")
+        }
         
         if (warnings.isNotEmpty()) {
             AlertDialog.Builder(this)
-                .setTitle("⚠️ Features Unavailable")
-                .setMessage("The following features won't work:\n\n• ${warnings.joinToString("\n• ")}\n\nDo you want to continue anyway?")
-                .setPositiveButton("Continue") { _, _ -> doStartTest() }
-                .setNegativeButton("Cancel", null)
+                .setTitle("⚠️ Test Cannot Start")
+                .setMessage("The selected profile requires features that are unavailable:\n\n• ${warnings.joinToString("\n• ")}")
+                .setPositiveButton("OK", null)
                 .show()
             return
         }
@@ -375,8 +395,6 @@ class MainActivity : AppCompatActivity() {
         
         startForegroundService(intent)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-        
-        updateTestControls(true)
     }
     
     private fun stopTest() {
@@ -418,14 +436,27 @@ class MainActivity : AppCompatActivity() {
                     binding.statusText.text = message
                 }
             }
+
+            service.onTestError = { message ->
+                runOnUiThread {
+                    updateTestControls(false)
+                    AlertDialog.Builder(this)
+                        .setTitle("⚠️ Test Cannot Start")
+                        .setMessage(message)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
             
             service.onTestComplete = { session ->
                 runOnUiThread {
-                    Toast.makeText(this, "Test complete! Battery dropped ${session.startBatteryLevel - (session.endBatteryLevel ?: 0)}%", Toast.LENGTH_LONG).show()
-                    
-                    // Generate and save report
+                    // Generate and save reports silently
                     val report = reportGenerator.generateReport(session, service.batteryMonitor)
-                    reportGenerator.saveReport(report, com.batterydrainer.benchmark.data.ExportFormat.HTML)
+                    reportGenerator.saveReportBundle(report)
+
+                    // Update UI to show test is complete
+                    val drop = session.startBatteryLevel - (session.endBatteryLevel ?: 0)
+                    binding.statusText.text = "Test complete! Battery dropped ${drop}%"
                 }
             }
         }

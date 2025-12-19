@@ -35,24 +35,26 @@ class NetworkStressor(private val context: Context) : Stressor {
     val bytesDownloaded = AtomicLong(0)
     val bytesPerSecond = MutableStateFlow(0L)
     
-    // Test URLs - large files for downloading
+    // Test URLs - large files for downloading (multiple fallbacks for reliability)
     private val testUrls = listOf(
-        // Speed test files (various sizes)
-        "http://speedtest.tele2.net/10MB.zip",
-        "http://speedtest.tele2.net/100MB.zip",
-        "http://ipv4.download.thinkbroadband.com/10MB.zip",
-        "http://ipv4.download.thinkbroadband.com/50MB.zip",
+        // Cloudflare speed test (very reliable)
+        "https://speed.cloudflare.com/__down?bytes=10000000",  // 10MB
+        "https://speed.cloudflare.com/__down?bytes=100000000", // 100MB
+        // Google storage test files
+        "https://storage.googleapis.com/chromiumos-test-assets-public/network/test_100k.bin",
+        // Fast.com test endpoint (Netflix CDN)
+        "https://ipv4c001.ord016.ix.nflxvideo.net/speedtest/range/0-10485760",
         // Fallback ping endpoints
         "https://www.google.com/generate_204",
         "https://connectivity-check.ubuntu.com/"
     )
-    
-    // Ping endpoints for light load
+
+    // Ping endpoints for light load (highly reliable endpoints)
     private val pingUrls = listOf(
         "https://www.google.com/generate_204",
         "https://www.cloudflare.com/cdn-cgi/trace",
-        "https://httpbin.org/get",
-        "https://api.ipify.org"
+        "https://connectivitycheck.gstatic.com/generate_204",
+        "https://clients3.google.com/generate_204"
     )
     
     private val client = OkHttpClient.Builder()
@@ -174,23 +176,36 @@ class NetworkStressor(private val context: Context) : Stressor {
     }
     
     private suspend fun runDownloadLoop(workerIndex: Int, small: Boolean) {
+        // Filter URLs based on size preference
         val urls = if (small) {
-            testUrls.filter { it.contains("10MB") || it.contains("generate_204") }
+            testUrls.filter { url ->
+                url.contains("10000000") || url.contains("10MB") ||
+                        url.contains("100k") || url.contains("generate_204")
+            }
         } else {
-            testUrls.filter { it.contains("100MB") || it.contains("50MB") }
+            testUrls.filter { url ->
+                url.contains("100000000") || url.contains("100MB") ||
+                        url.contains("50MB") || url.contains("10485760")
+            }
         }
-        
-        var urlIndex = workerIndex % urls.size.coerceAtLeast(1)
-        
+
+        // Use all test URLs as fallback if no matches
+        val downloadUrls = if (urls.isNotEmpty()) urls else testUrls.take(4)
+        var urlIndex = workerIndex % downloadUrls.size.coerceAtLeast(1)
+        var consecutiveErrors = 0
+
         while (shouldRun.get()) {
             try {
-                val url = if (urls.isNotEmpty()) urls[urlIndex % urls.size] else testUrls[0]
+                val url = downloadUrls[urlIndex % downloadUrls.size]
                 urlIndex++
-                
+
                 downloadFile(url)
+                consecutiveErrors = 0
             } catch (e: Exception) {
-                // On error, wait briefly then retry
-                delay(1000)
+                consecutiveErrors++
+                // Exponential backoff on errors, max 10 seconds
+                val delayMs = minOf(1000L * consecutiveErrors, 10000L)
+                delay(delayMs)
             }
         }
     }
