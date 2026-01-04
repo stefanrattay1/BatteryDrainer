@@ -247,15 +247,22 @@ class MainActivity : AppCompatActivity() {
     private fun startMonitoring() {
         batteryMonitor.startMonitoring(1000)
         thermalProtection.startMonitoring(2000)
-        
+
         lifecycleScope.launch {
             batteryMonitor.currentReading.collectLatest { reading ->
                 reading?.let { updateBatteryDisplay(it) }
             }
         }
-        
+
         lifecycleScope.launch {
             thermalProtection.thermalState.collectLatest { state ->
+                updateThermalDisplay()
+            }
+        }
+
+        // Also observe temperature source changes
+        lifecycleScope.launch {
+            thermalProtection.temperatureSource.collectLatest { source ->
                 updateThermalDisplay()
             }
         }
@@ -295,7 +302,10 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun updateThermalDisplay() {
-        binding.thermalStatus.text = thermalProtection.getThermalStateDescription()
+        // Show thermal state and temperature source
+        val stateDesc = thermalProtection.getThermalStateDescription()
+        val sourceDesc = thermalProtection.getTemperatureSourceDescription()
+        binding.thermalStatus.text = "$stateDesc\n$sourceDesc"
         binding.thermalStatus.setTextColor(
             when (thermalProtection.thermalState.value) {
                 com.batterydrainer.benchmark.data.ThermalState.NONE -> getColor(R.color.temp_normal)
